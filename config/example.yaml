@@ -1,29 +1,33 @@
 inputs:
   - type: stdin
 
-  - type: file
-    path: /var/log/app.log
+pipeline:
+  filters:
+    - level: error
+  transforms:
+    - add_fields:
+        env: production
+  dedup:
+    enabled: true
+    window: 5s
+  sampling:
+    rate: 0.5
+  batch:
+    size: 100
+    interval: 2s
+  alerts:
+    - name: high_error_rate
+      level: error
+      threshold: 10
+      window: 60s
+    - name: oom_detected
+      contains: "out of memory"
+      threshold: 1
+      window: 30s
 
 outputs:
-  - name: stdout
-    type: stdout
+  - type: stdout
     format: json
-
-  - name: errors_file
-    type: file
-    path: /var/log/errors.log
-    format: json
-    filters:
-      level: error
-
-  - name: warnings_file
-    type: file
-    path: /var/log/warnings.log
+  - type: file
+    path: /var/log/logpipe/out.log
     format: plain
-    filters:
-      level: warn
-      contains: "timeout"
-
-health:
-  enabled: true
-  address: ":8080"
