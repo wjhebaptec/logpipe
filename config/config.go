@@ -1,85 +1,60 @@
 package config
 
 import (
-	"fmt"
+	"errors"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the top-level logpipe configuration.
-type Config struct {
-	Inputs  []InputConfig  `yaml:"inputs"`
-	Filters []FilterConfig `yaml:"filters"`
-	Outputs []OutputConfig `yaml:"outputs"`
+// Filter defines criteria for matching log entries.
+type Filter struct {
+	Level    string            `yaml:"level"`
+	Contains string            `yaml:"contains"`
+	Fields   map[string]string `yaml:"fields"`
 }
 
-// InputConfig defines a log source.
-type InputConfig struct {
+// Input describes a log source.
+type Input struct {
 	Name string `yaml:"name"`
-	Type string `yaml:"type"` // e.g. "file", "stdin", "tcp"
+	Type string `yaml:"type"`
 	Path string `yaml:"path,omitempty"`
 	Addr string `yaml:"addr,omitempty"`
 }
 
-// FilterConfig defines a filtering rule applied to log entries.
-type FilterConfig struct {
-	Name    string            `yaml:"name"`
-	Field   string            `yaml:"field"`
-	Match   string            `yaml:"match"`
-	Labels  map[string]string `yaml:"labels,omitempty"`
+// Output describes a log destination.
+type Output struct {
+	Name    string   `yaml:"name"`
+	Type    string   `yaml:"type"`
+	Path    string   `yaml:"path,omitempty"`
+	Addr    string   `yaml:"addr,omitempty"`
+	Filters []Filter `yaml:"filters,omitempty"`
 }
 
-// OutputConfig defines a log destination.
-type OutputConfig struct {
-	Name   string `yaml:"name"`
-	Type   string `yaml:"type"` // e.g. "stdout", "file", "http"
-	Target string `yaml:"target,omitempty"`
-	Format string `yaml:"format,omitempty"` // e.g. "json", "text"
+// Config is the top-level configuration structure.
+type Config struct {
+	Inputs  []Input  `yaml:"inputs"`
+	Outputs []Output `yaml:"outputs"`
 }
 
 // Load reads and parses a YAML config file from the given path.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("config: reading file %q: %w", path, err)
+		return nil, err
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("config: parsing YAML: %w", err)
+		return nil, err
 	}
 
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("config: validation failed: %w", err)
+	if len(cfg.Inputs) == 0 {
+		return nil, errors.New("config: at least one input is required")
+	}
+	if len(cfg.Outputs) == 0 {
+		return nil, errors.New("config: at least one output is required")
 	}
 
 	return &cfg, nil
-}
-
-// Validate checks that the configuration is semantically valid.
-func (c *Config) Validate() error {
-	if len(c.Inputs) == 0 {
-		return fmt.Errorf("at least one input must be defined")
-	}
-	if len(c.Outputs) == 0 {
-		return fmt.Errorf("at least one output must be defined")
-	}
-	for i, inp := range c.Inputs {
-		if inp.Name == "" {
-			return fmt.Errorf("input[%d]: name is required", i)
-		}
-		if inp.Type == "" {
-			return fmt.Errorf("input %q: type is required", inp.Name)
-		}
-	}
-	for i, out := range c.Outputs {
-		if out.Name == "" {
-			return fmt.Errorf("output[%d]: name is required", i)
-		}
-		if out.Type == "" {
-			return fmt.Errorf("output %q: type is required", out.Name)
-		}
-	}
-	return nil
 }
