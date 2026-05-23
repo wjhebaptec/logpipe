@@ -1,36 +1,29 @@
-# logpipe example configuration
-
 inputs:
-  - name: app-file
-    type: file
-    path: /var/log/myapp/app.log
+  - type: stdin
 
-  - name: syslog-tcp
-    type: tcp
-    addr: "0.0.0.0:5140"
-
-filters:
-  - name: errors-only
-    field: level
-    match: "error"
-    labels:
-      severity: high
-
-  - name: service-api
-    field: service
-    match: "api-gateway"
+  - type: file
+    path: /var/log/app.log
 
 outputs:
-  - name: local-stdout
+  - name: stdout
     type: stdout
     format: json
 
-  - name: error-file
+  - name: errors_file
     type: file
-    target: /var/log/logpipe/errors.log
+    path: /var/log/errors.log
     format: json
+    filters:
+      level: error
 
-  - name: remote-collector
-    type: http
-    target: "https://logs.example.com/ingest"
-    format: json
+  - name: warnings_file
+    type: file
+    path: /var/log/warnings.log
+    format: plain
+    filters:
+      level: warn
+      contains: "timeout"
+
+health:
+  enabled: true
+  address: ":8080"
