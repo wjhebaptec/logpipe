@@ -1,54 +1,76 @@
+# logpipe example configuration
+
 inputs:
-  - name: app-logs
+  - id: app_logs
     type: file
-    path: /var/log/app.log
-    checkpoint: /var/run/logpipe/app.checkpoint.json
-
-  - name: syslog
-    type: file
-    path: /var/log/syslog
-    checkpoint: /var/run/logpipe/syslog.checkpoint.json
-
-outputs:
-  - name: stdout
-    type: stdout
+    path: /var/log/app/app.log
     format: json
 
-  - name: errors-file
+  - id: syslog
+    type: file
+    path: /var/log/syslog
+    format: plain
+
+outputs:
+  - id: errors_file
     type: file
     path: /var/log/logpipe/errors.log
-    format: plain
+    format: json
     filters:
       level: error
 
-transforms:
-  - add_fields:
-      env: production
-      host: "${HOSTNAME}"
-  - remove_fields:
-      - debug_trace
+  - id: stdout_all
+    type: stdout
+    format: plain
 
-redact:
-  - field: message
-    pattern: '\b\d{4}-\d{4}-\d{4}-\d{4}\b'
-    replacement: "[REDACTED-CC]"
-  - field: password
-    replacement: "***"
+transform:
+  add_fields:
+    host: my-server
+    pipeline: logpipe
+  remove_fields:
+    - debug_info
+  upper_level: true
 
-sampling:
-  rate: 0.5
-  level: debug
+labels:
+  prefix: lp
+  static:
+    env: production
+    region: us-east-1
+  copy_from:
+    service_label: svc
 
-batch:
-  size: 100
-  interval: 5s
+filters:
+  - level: error
+    contains: "timeout"
 
 health:
   address: ":9090"
 
-alerts:
-  - name: high-error-rate
-    level: error
-    threshold: 10
-    window: 60s
-    webhook: https://hooks.example.com/alert
+metrics:
+  enabled: true
+
+dedup:
+  window: 5s
+
+rate_limit:
+  rate: 1000
+  burst: 100
+
+batch:
+  size: 50
+  interval: 2s
+
+sampling:
+  rate: 0.5
+
+alert:
+  rules:
+    - level: error
+      threshold: 10
+      window: 60s
+      webhook: https://hooks.example.com/alert
+
+retry:
+  max_attempts: 3
+  initial_delay: 500ms
+  max_delay: 5s
