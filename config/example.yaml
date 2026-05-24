@@ -1,33 +1,40 @@
 inputs:
   - type: stdin
 
-pipeline:
-  filters:
-    - level: error
-  transforms:
-    - add_fields:
-        env: production
-  dedup:
-    enabled: true
-    window: 5s
-  sampling:
-    rate: 0.5
-  batch:
-    size: 100
-    interval: 2s
-  alerts:
-    - name: high_error_rate
-      level: error
-      threshold: 10
-      window: 60s
-    - name: oom_detected
-      contains: "out of memory"
-      threshold: 1
-      window: 30s
-
 outputs:
-  - type: stdout
+  - name: stdout
+    type: stdout
     format: json
-  - type: file
-    path: /var/log/logpipe/out.log
-    format: plain
+    filters:
+      level: info
+
+  - name: errors_file
+    type: file
+    path: /var/log/errors.log
+    format: json
+    filters:
+      level: error
+      contains: "exception"
+
+transform:
+  add_fields:
+    env: production
+  remove_fields:
+    - debug_id
+  rename_fields:
+    msg: message
+  upper_level: true
+
+throttle:
+  max_per_window: 200
+  window: 10s
+  match_level: error
+
+alerts:
+  - level: error
+    threshold: 10
+    window: 60s
+    message: "High error rate detected"
+
+health:
+  address: ":9090"
