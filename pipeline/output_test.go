@@ -39,6 +39,25 @@ func TestOutputWriter_Write_Plain(t *testing.T) {
 	}
 }
 
+func TestOutputWriter_Write_WithFields(t *testing.T) {
+	var buf bytes.Buffer
+	ow := &OutputWriter{Name: "test", Format: "json", Writer: &buf}
+
+	entry := LogEntry{
+		Level:   "error",
+		Message: "connection refused",
+		Fields:  map[string]interface{}{"host": "localhost", "port": 5432},
+	}
+	if err := ow.Write(entry); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "localhost") {
+		t.Errorf("expected field value 'localhost' in output, got: %q", out)
+	}
+}
+
 func TestNewFileOutput_Stdout(t *testing.T) {
 	ow, err := NewFileOutput("stdout-out", "-", "plain")
 	if err != nil {
