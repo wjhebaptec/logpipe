@@ -1,40 +1,54 @@
 inputs:
-  - type: stdin
+  - name: app-logs
+    type: file
+    path: /var/log/app.log
+    checkpoint: /var/run/logpipe/app.checkpoint.json
+
+  - name: syslog
+    type: file
+    path: /var/log/syslog
+    checkpoint: /var/run/logpipe/syslog.checkpoint.json
 
 outputs:
   - name: stdout
     type: stdout
     format: json
-    filters:
-      level: info
 
-  - name: errors_file
+  - name: errors-file
     type: file
-    path: /var/log/errors.log
-    format: json
+    path: /var/log/logpipe/errors.log
+    format: plain
     filters:
       level: error
-      contains: "exception"
 
-transform:
-  add_fields:
-    env: production
-  remove_fields:
-    - debug_id
-  rename_fields:
-    msg: message
-  upper_level: true
+transforms:
+  - add_fields:
+      env: production
+      host: "${HOSTNAME}"
+  - remove_fields:
+      - debug_trace
 
-throttle:
-  max_per_window: 200
-  window: 10s
-  match_level: error
+redact:
+  - field: message
+    pattern: '\b\d{4}-\d{4}-\d{4}-\d{4}\b'
+    replacement: "[REDACTED-CC]"
+  - field: password
+    replacement: "***"
 
-alerts:
-  - level: error
-    threshold: 10
-    window: 60s
-    message: "High error rate detected"
+sampling:
+  rate: 0.5
+  level: debug
+
+batch:
+  size: 100
+  interval: 5s
 
 health:
   address: ":9090"
+
+alerts:
+  - name: high-error-rate
+    level: error
+    threshold: 10
+    window: 60s
+    webhook: https://hooks.example.com/alert
