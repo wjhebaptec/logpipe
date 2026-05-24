@@ -14,6 +14,20 @@ const (
 	StateHalfOpen
 )
 
+// String returns a human-readable name for the state.
+func (s State) String() string {
+	switch s {
+	case StateClosed:
+		return "closed"
+	case StateOpen:
+		return "open"
+	case StateHalfOpen:
+		return "half-open"
+	default:
+		return "unknown"
+	}
+}
+
 // CircuitBreaker prevents repeated calls to a failing output.
 type CircuitBreaker struct {
 	mu           sync.Mutex
