@@ -2,8 +2,7 @@
 
 inputs:
   - id: app_logs
-    type: file
-    path: /var/log/app/app.log
+    type: stdin
     format: json
 
   - id: syslog
@@ -11,66 +10,79 @@ inputs:
     path: /var/log/syslog
     format: plain
 
+filters:
+  level: error
+  contains: ""
+  fields: {}
+
+transform:
+  add_fields:
+    env: production
+  remove_fields: []
+  rename_fields: {}
+  uppercase_level: true
+
+dedup:
+  enabled: true
+  window: 10s
+
+sampling:
+  rate: 1.0
+
+rate_limit:
+  rate: 500
+  burst: 50
+
+throttle:
+  max: 200
+  window: 1m
+
+batch:
+  size: 50
+  interval: 5s
+
+redact:
+  rules:
+    - field: password
+      replace: "[REDACTED]"
+    - field: token
+      pattern: '[A-Za-z0-9+/=]{20,}'
+      replace: "[TOKEN]"
+
+schema:
+  rules:
+    - field: message
+      required: true
+    - field: level
+      required: true
+      pattern: '^(DEBUG|INFO|WARN|ERROR|FATAL)$'
+
+alerts:
+  - name: high_error_rate
+    level: error
+    threshold: 10
+    window: 1m
+    webhook: https://hooks.example.com/alert
+
+aggregate:
+  group_by: service
+  window: 30s
+  max_groups: 100
+
 outputs:
-  - id: errors_file
+  - id: file_out
     type: file
-    path: /var/log/logpipe/errors.log
+    path: /var/log/logpipe/out.log
     format: json
     filters:
       level: error
 
-  - id: stdout_all
+  - id: stdout_out
     type: stdout
     format: plain
-
-transform:
-  add_fields:
-    host: my-server
-    pipeline: logpipe
-  remove_fields:
-    - debug_info
-  upper_level: true
-
-labels:
-  prefix: lp
-  static:
-    env: production
-    region: us-east-1
-  copy_from:
-    service_label: svc
-
-filters:
-  - level: error
-    contains: "timeout"
 
 health:
   address: ":9090"
 
-metrics:
-  enabled: true
-
-dedup:
-  window: 5s
-
-rate_limit:
-  rate: 1000
-  burst: 100
-
-batch:
-  size: 50
-  interval: 2s
-
-sampling:
-  rate: 0.5
-
-alert:
-  rules:
-    - level: error
-      threshold: 10
-      window: 60s
-      webhook: https://hooks.example.com/alert
-
-retry:
-  max_attempts: 3
-  initial_delay: 500ms
-  max_delay: 5s
+checkpoint:
+  path: /var/lib/logpipe/checkpoint.json
