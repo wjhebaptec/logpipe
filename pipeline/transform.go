@@ -23,9 +23,7 @@ func Transform(entry *LogEntry, cfg TransformConfig) {
 
 	// Add static fields
 	for k, v := range cfg.AddFields {
-		if entry.Fields == nil {
-			entry.Fields = make(map[string]interface{})
-		}
+		ensureFields(entry)
 		entry.Fields[k] = v
 	}
 
@@ -37,9 +35,7 @@ func Transform(entry *LogEntry, cfg TransformConfig) {
 	// Rename fields
 	for oldKey, newKey := range cfg.RenameFields {
 		if val, ok := entry.Fields[oldKey]; ok {
-			if entry.Fields == nil {
-				entry.Fields = make(map[string]interface{})
-			}
+			ensureFields(entry)
 			entry.Fields[newKey] = val
 			delete(entry.Fields, oldKey)
 		}
@@ -52,11 +48,16 @@ func Transform(entry *LogEntry, cfg TransformConfig) {
 
 	// Inject timestamp if missing or forced
 	if cfg.AddTimestamp {
-		if entry.Fields == nil {
-			entry.Fields = make(map[string]interface{})
-		}
+		ensureFields(entry)
 		if _, exists := entry.Fields["transform_ts"]; !exists {
 			entry.Fields["transform_ts"] = time.Now().UTC().Format(time.RFC3339)
 		}
+	}
+}
+
+// ensureFields initialises the Fields map on entry if it is nil.
+func ensureFields(entry *LogEntry) {
+	if entry.Fields == nil {
+		entry.Fields = make(map[string]interface{})
 	}
 }
